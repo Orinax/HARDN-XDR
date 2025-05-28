@@ -25,6 +25,7 @@
 
 [HARDN.md](docs/HARDN.md)
 [deb_stig.md](docs/deb_stig.md)
+[License](./LICENSE)
 
 ### HARDN-XDR
 - **Our** Goal: assist the open source community in building a Debian based **"GOLDEN IMAGE"** System.
