@@ -145,7 +145,7 @@ HARDN/
 
 <p align="center">
   <img src="https://img.shields.io/badge/LICENSE-white?style=for-the-badge&labelColor=black" alt="LICENSE"><br><br>
-This project is licensed under the [MIT License](./LICENSE)
+This project is licensed under the [MIT License](https://github.com/OpenSource-For-Freedom/HARDN-XDR/blob/main/LICENSE)
   
 </p>
 
