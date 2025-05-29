@@ -24,9 +24,6 @@
   <img src="https://img.shields.io/badge/OVERVIEW-white?style=for-the-badge&labelColor=black" alt="OVERVIEW"><br><br>
 </p>
 
-[HARDN.md](docs/HARDN.md)
-[deb_stig.md](docs/deb_stig.md)
-[License](./LICENSE)
 
 ## HARDN-XDR
 - **Our Goal**: 
