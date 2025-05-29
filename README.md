@@ -145,7 +145,7 @@ HARDN/
 
 <p align="center">
   <img src="https://img.shields.io/badge/LICENSE-white?style=for-the-badge&labelColor=black" alt="LICENSE"><br><br>
-This project is licensed under the [MIT License](https://github.com/OpenSource-For-Freedom/HARDN-XDR/blob/main/LICENSE)
+This project is licensed under the MIT License.
   
 </p>
 
@@ -153,7 +153,7 @@ This project is licensed under the [MIT License](https://github.com/OpenSource-F
 
 <p align="center">
   <img src="https://img.shields.io/badge/CONTACT-white?style=for-the-badge&labelColor=black" alt="CONTACT"><br><br>
-[office@cybersynapse.ro](mailto:office@cybersynapse.ro)
+office@cybersynapse.ro
 </p>
 
 
