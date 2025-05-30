@@ -46,19 +46,19 @@ update_system_packages() {
 install_package_dependencies() {
     printf "\\033[1;31m[+] Installing package dependencies from ../../progs.csv...\\033[0m\\n"
     progsfile="../../progs.csv"
-    apt-get install apt-listbugs -y >/dev/null 2>&1 || {
-        printf "\\033[1;31m[-] Error: Failed to install apt-listbugs. Please check your package manager.\\033[0m\\n"
-        return 1
-    }
-    apt-get install apt-listchanges -y >/dev/null 2>&1 || {
-        printf "\\033[1;31m[-] Error: Failed to install apt-listchanges. Please check your package manager.\\033[0m\\n"
-        return 1
-    }
 
-    apt-get install libpam-tmpdir -y >/dev/null 2>&1 || {
-        printf "\\033[1;31m[-] Error: Failed to install libpam-tmpdir. Please check your package manager.\\033[0m\\n"
-        return 1
-    }
+    # Ensure git is installed first
+    if ! command -v git >/dev/null 2>&1; then
+        printf "\\033[1;34m[*] Git is not installed. Attempting to install git...\\033[0m\\n"
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y git >/dev/null 2>&1; then
+            printf "\\033[1;32m[+] Successfully installed git.\\033[0m\\n"
+        else
+            printf "\\033[1;31m[-] Error: Failed to install git. Please check your package manager.\\033[0m\\n"
+            return 1
+        fi
+    else
+        printf "\\033[1;34m[*] Git is already installed.\\033[0m\\n"
+    fi
 
     # Check if the CSV file exists
     if [[ ! -f "$progsfile" ]]; then
@@ -66,30 +66,51 @@ install_package_dependencies() {
         return 1
     fi
 
-    while IFS=, read -r name _ desc || [[ -n "$name" ]]; do
+    while IFS=, read -r name version || [[ -n "$name" ]]; do
         # Skip comments and empty lines
         [[ -z "$name" || "$name" =~ ^[[:space:]]*# ]] && continue
 
         # Clean up package name (remove quotes and trim whitespace)
         name=$(echo "$name" | xargs)
-
-
+        version=$(echo "$version" | xargs)
 
         if [[ -n "$name" ]]; then
-            if ! dpkg -s "$name" >/dev/null 2>&1; then
-                printf "\\033[1;34m[*] Attempting to install package: %s (%s)...\\033[0m\\n" "$name" "${desc:-No description}"
-                if DEBIAN_FRONTEND=noninteractive apt install -y "$name"; then
-                    printf "\\033[1;32m[+] Successfully installed %s.\\033[0m\\n" "$name"
-                else
-                    printf "\\033[1;33m[!] apt install failed for %s, trying apt-get...\\033[0m\\n" "$name"
-                    if DEBIAN_FRONTEND=noninteractive apt-get install -y "$name"; then
-                         printf "\\033[1;32m[+] Successfully installed %s with apt-get.\\033[0m\\n" "$name"
-                    else
-                        printf "\\033[1;31m[-] Error: Failed to install %s with both apt and apt-get. Please check manually.\\033[0m\\n" "$name"
-                    fi
-                fi
+            if [[ "$version" == "latest" ]]; then
+                printf "\\033[1;34m[*] Attempting to manually install package: %s (version: %s)...\\033[0m\\n" "$name" "$version"
+                # Custom logic for git-based installation
+                case "$name" in
+                    qemu-kvm)
+                        printf "\\033[1;34m[*] Manually installing qemu-kvm using git...\\033[0m\\n"
+                        git clone https://github.com/qemu/qemu.git /tmp/qemu
+                        cd /tmp/qemu || { printf "\\033[1;31m[-] Failed to access QEMU directory.\\033[0m\\n"; return 1; }
+                        ./configure && make && sudo make install
+                        ;;
+                    chkrootkit)
+                        printf "\\033[1;34m[*] Manually installing chkrootkit using git...\\033[0m\\n"
+                        git clone https://github.com/ChkRootkit/chkrootkit.git /tmp/chkrootkit
+                        cd /tmp/chkrootkit || { printf "\\033[1;31m[-] Failed to access chkrootkit directory.\\033[0m\\n"; return 1; }
+                        make sense && sudo make install
+                        ;;
+                    *)
+                        printf "\\033[1;33m[!] Warning: No manual installation process defined for %s. Skipping...\\033[0m\\n" "$name"
+                        ;;
+                esac
             else
-                printf "\\033[1;34m[*] Package %s is already installed.\\033[0m\\n" "$name"
+                if ! dpkg -s "$name" >/dev/null 2>&1; then
+                    printf "\\033[1;34m[*] Attempting to install package: %s (%s)...\\033[0m\\n" "$name" "${version:-No description}"
+                    if DEBIAN_FRONTEND=noninteractive apt install -y "$name=$version"; then
+                        printf "\\033[1;32m[+] Successfully installed %s.\\033[0m\\n" "$name"
+                    else
+                        printf "\\033[1;33m[!] apt install failed for %s, trying apt-get...\\033[0m\\n" "$name"
+                        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$name=$version"; then
+                             printf "\\033[1;32m[+] Successfully installed %s with apt-get.\\033[0m\\n" "$name"
+                        else
+                            printf "\\033[1;31m[-] Error: Failed to install %s with both apt and apt-get. Please check manually.\\033[0m\\n" "$name"
+                        fi
+                    fi
+                else
+                    printf "\\033[1;34m[*] Package %s is already installed.\\033[0m\\n" "$name"
+                fi
             fi
         else
             printf "\\033[1;33m[!] Warning: Skipping line with empty package name.\\033[0m\\n"
@@ -398,7 +419,7 @@ setup_security(){
             # Ensure findtime is at least 15 minutes (900 seconds)
             sed -i 's/^\s*findtime\s*=\s*.*/findtime = 900/' "$jail_local" 2>/dev/null || true
             # Ensure maxretry is 3 or less
-            sed -i 's/^\s*maxretry\s*=\s*.*/maxretry = 3/' "$jail_local" 2>/dev/null || true
+            sed -i 's/^\s*maxretry\s*=\s*.*/maxretry = 5/' "$jail_local" 2>/dev/null || true
 
             # Ensure sshd jail is enabled (uncomment or add if missing)
             if ! grep -q '^\s*\[sshd\]' "$jail_local"; then
@@ -796,8 +817,6 @@ EOF
     
     ################################### OpenSSH Server
     printf "Configuring OpenSSH...\\n"
-    sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
     sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
     sed -i 's/#Protocol 2/Protocol 2/' /etc/ssh/sshd_config
     sed -i 's/#MaxAuthTries 6/MaxAuthTries 3/' /etc/ssh/sshd_config
@@ -970,7 +989,6 @@ EOF
 -w /etc/cron.monthly/ -p wa -k system-config
 -w /etc/anacrontab -p wa -k system-config
 -w /var/spool/cron/crontabs/ -p wa -k system-config
--w /etc/ssh/sshd_config -p wa -k system-config
 -w /etc/sysctl.conf -p wa -k system-config
 -w /etc/modprobe.d/ -p wa -k system-config
 -w /etc/apt/sources.list -p wa -k system-config
@@ -1267,56 +1285,7 @@ EOF
     else
         printf "\\033[1;33m[!] AIDE already installed, skipping configuration...\\033[0m\\n"
     fi
-    ################################ STIG-PAM
-    printf "\\033[1;31m[+] Setting basic STIG compliant PAM rules...\\033[0m\\n"
-
-    # Configure pam_faillock for account lockout
-    printf "Configuring pam_faillock for account lockout...\\n"
-    if [ -f /etc/pam.d/common-auth ]; then
-        # Add pam_faillock.so to common-auth (before pam_unix.so)
-        if ! grep -q "pam_faillock.so" /etc/pam.d/common-auth; then
-            sed -i '/^auth.*pam_unix.so/i auth       required      pam_faillock.so preauth silent audit deny=5 unlock_time=900' /etc/pam.d/common-auth
-            sed -i '/^auth.*pam_unix.so/a auth       [default=die] pam_faillock.so authfail audit deny=5 unlock_time=900' /etc/pam.d/common-auth
-            printf "\\033[1;32m[+] Added pam_faillock.so to /etc/pam.d/common-auth.\\033[0m\\n"
-        fi
-    fi
-
-    if [ -f /etc/pam.d/common-account ]; then
-        # Add pam_faillock.so to common-account (before pam_unix.so)
-        if ! grep -q "pam_faillock.so" /etc/pam.d/common-account; then
-            sed -i '/^account.*pam_unix.so/i account    required      pam_faillock.so' /etc/pam.d/common-account
-            printf "\\033[1;32m[+] Added pam_faillock.so to /etc/pam.d/common-account.\\033[0m\\n"
-        fi
-    fi
-
-    # Configure pam_limits for session limits
-    printf "Configuring pam_limits for session limits...\\n"
-    if [ -f /etc/pam.d/common-session ]; then
-        if ! grep -q "pam_limits.so" /etc/pam.d/common-session; then
-            echo "session    required      pam_limits.so" >> /etc/pam.d/common-session
-            printf "\\033[1;32m[+] Added pam_limits.so to /etc/pam.d/common-session.\\033[0m\\n"
-        fi
-    fi
-
-    # Configure pam_lastlog for login notifications
-    printf "Configuring pam_lastlog for login notifications...\\n"
-    if [ -f /etc/pam.d/common-session ]; then
-        if ! grep -q "pam_lastlog.so" /etc/pam.d/common-session; then
-            echo "session    optional      pam_lastlog.so" >> /etc/pam.d/common-session
-            printf "\\033[1;32m[+] Added pam_lastlog.so to /etc/pam.d/common-session.\\033[0m\\n"
-        fi
-    fi
-
-    # Keep pam_tmpdir configuration as requested
-    printf "Configuring PAM tmpdir...\\n"
-    if [ -f /etc/pam.d/common-session ]; then
-        if ! grep -q "pam_tmpdir.so" /etc/pam.d/common-session; then
-            echo "session optional pam_tmpdir.so" >> /etc/pam.d/common-session
-            printf "\\033[1;32m[+] Added pam_tmpdir.so to /etc/pam.d/common-session.\\033[0m\\n"
-        fi
-    fi
-
-    printf "\\033[1;32m[+] Basic STIG compliant PAM rules configuration attempt completed.\\033[0m\\n"
+  
     #################################### YARA
     printf "\\033[1;31m[+] Setting up YARA rules...\\033[0m\\n"
 
